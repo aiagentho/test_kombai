@@ -37,7 +37,7 @@ const ChartContainer = styled(Paper)(({ theme }) => ({
   border: `1px solid ${theme.palette.divider}`,
 }));
 
-export default function Dashboard() {
+export default function Dashboard({ children }: { children?: React.ReactNode }) {
   const { user, usage } = mockStore;
   const { usageStats } = mockQuery;
 
@@ -57,6 +57,8 @@ export default function Dashboard() {
           Here's an overview of your account activity and usage statistics.
         </Typography>
       </Box>
+
+      {children} {/* Render children here */}
 
       {/* Stats Cards */}
       <StyledGrid>
@@ -112,7 +114,7 @@ export default function Dashboard() {
         </Typography>
         
         <Stack spacing={3}>
-          <StyledGrid sx={{ 
+          <StyledGrid sx={{
             gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
             [theme => theme.breakpoints.up('lg')]: {
               gridTemplateColumns: 'repeat(3, 1fr)',

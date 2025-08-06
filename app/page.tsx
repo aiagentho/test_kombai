@@ -1,59 +1,54 @@
 'use client';
 
-import React, { useState } from 'react';
-import { ThemeProvider, CssBaseline } from '@mui/material';
-import createCache from '@emotion/cache';
-import { CacheProvider } from '@emotion/react';
-import theme from '../theme/theme';
+import React, { useState, useEffect } from 'react';
 import DashboardLayout from '../components/layout/DashboardLayout';
-import AuthForm from '../components/auth/AuthForm';
 import Dashboard from '../components/pages/Dashboard';
 import Analytics from '../components/pages/Analytics';
 import Credits from '../components/pages/Credits';
 import Billing from '../components/pages/Billing';
 import Settings from '../components/pages/Settings';
 import Profile from '../components/pages/Profile';
-import { mockStore } from '../data/saasMockData';
+import { supabase } from '../utils/supabase/client';
+import { User } from '@supabase/supabase-js';
+import LandingPage from './landing/page'; // Import the new LandingPage
+import LoginPage from './login/page'; // Import the LoginPage
+import SignUpPage from './signup/page'; // Import the SignUpPage
 
-const createEmotionCache = () => {
-  return createCache({
-    key: "mui",
-    prepend: true,
-  });
-};
-
-const emotionCache = createEmotionCache();
-
-type AuthMode = 'login' | 'signup' | 'reset';
 type Page = 'dashboard' | 'analytics' | 'credits' | 'billing' | 'settings' | 'profile';
 
 export default function Home() {
-  const [isAuthenticated, setIsAuthenticated] = useState(true); // Set to true for demo
-  const [authMode, setAuthMode] = useState<AuthMode>('login');
+  const [user, setUser] = useState<User | null>(null);
   const [currentPage, setCurrentPage] = useState<Page>('dashboard');
   const [authLoading, setAuthLoading] = useState(false);
   const [authError, setAuthError] = useState('');
 
-  const { user } = mockStore;
+  useEffect(() => {
+    const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user || null);
+    });
 
-  const handleAuth = async (data: any) => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user || null);
+    });
+
+    return () => {
+      authListener.subscription.unsubscribe();
+    };
+  }, []);
+
+  const handleLogout = async () => {
     setAuthLoading(true);
     setAuthError('');
-    
     try {
-      // Simulate authentication
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      setIsAuthenticated(true);
-    } catch (error) {
-      setAuthError('Authentication failed. Please try again.');
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
+      setUser(null);
+      setCurrentPage('dashboard');
+    } catch (error: any) {
+      setAuthError(error.message || 'Logout failed.');
     } finally {
       setAuthLoading(false);
     }
-  };
-
-  const handleLogout = () => {
-    setIsAuthenticated(false);
-    setCurrentPage('dashboard');
   };
 
   const handleNavigate = (path: string) => {
@@ -78,41 +73,25 @@ export default function Home() {
     }
   };
 
-  if (!isAuthenticated) {
-    return (
-      <CacheProvider value={emotionCache}>
-        <ThemeProvider theme={theme}>
-          <CssBaseline />
-          <AuthForm
-            mode={authMode}
-            onSubmit={handleAuth}
-            onModeChange={setAuthMode}
-            loading={authLoading}
-            error={authError}
-          />
-        </ThemeProvider>
-      </CacheProvider>
-    );
+  // This component now acts as a router based on authentication status
+  if (!user) {
+    // If not authenticated, render the LandingPage
+    return <LandingPage />;
   }
 
   return (
-    <CacheProvider value={emotionCache}>
-      <ThemeProvider theme={theme}>
-        <CssBaseline />
-        <DashboardLayout
-          user={{
-            name: user.name,
-            email: user.email,
-            avatar: user.avatar,
-            plan: user.plan.charAt(0).toUpperCase() + user.plan.slice(1)
-          }}
-          currentPath={`/${currentPage}`}
-          onNavigate={handleNavigate}
-          onLogout={handleLogout}
-        >
-          {renderCurrentPage()}
-        </DashboardLayout>
-      </ThemeProvider>
-    </CacheProvider>
+    <DashboardLayout
+      user={{
+        name: user.user_metadata?.name || user.email || 'User',
+        email: user.email || '',
+        avatar: user.user_metadata?.avatar_url || '',
+        plan: 'Free' // Placeholder, integrate with actual plan later
+      }}
+      currentPath={`/${currentPage}`}
+      onNavigate={handleNavigate}
+      onLogout={handleLogout}
+    >
+      {renderCurrentPage()}
+    </DashboardLayout>
   );
 }
